@@ -1,0 +1,276 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(statsr)
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+```
+
+### Load data
+
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+ This dataset includes information from Rotten Tomatoes and IMDB for a random sample of movies. And the dataset is comprised of 651 randomly sampled movies produced and released before 2016. Observations in the sample are collected by random sampling method. Therefore we can generalize the result.
+ 
+ However there is no random assignment. It is not experiment but observational study. Therefore we can not assume that there is causality.
+
+And data were collected from someone who want to answer the questions. Therefore there can be some bias.
+
+* * *
+
+## Part 2: Research question
+
+As a data scientist at Paramount Pictures, I would like to figure out what valuables have strong relationship with audience_score in the data set. And I would like to predict the audience_score when new movie introduced.
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Check dimension**
+```{r}
+dim(movies)
+```
+
+There are 651 observations(movies) and 32 variables.
+
+**Check structure**
+```{r}
+str(movies)
+```
+
+Firstly, I can use numeric variables to make a model.
+There are runtime, imdb_rating, imdb_num_votes, critics_score, audience_score.
+Audience_score will be the  response variable.
+Though year, month, day look like numeric variables, I will change them into categorical variables.
+
+Secondly, I will use title_type, genre, mpaa_rating, critics_rating, audience_rating, 
+best_pic_nom, best_pic_win, best_actor_win, best_actress_win, best_dir_win, top200_box
+as categorical variables.
+
+Thirdly, I will omit title, studio, director, actor, imdb_url which do not make any sense to include in a statistical analysis.
+
+**Check data summary**
+```{r}
+summary(movies)
+```
+There are some missing valuse in 'runtime' and 'dvd_rel_'.
+Therefore the observation should be filtered.
+And I will omit the movie "Godzilla" to test the model later.
+
+**Manufacturing and selecting variables**
+```{r}
+movies_set <- movies %>% 
+  filter(title != "Godzilla" & !is.na(runtime) & !is.na(dvd_rel_year)) %>% 
+  mutate(thtr_rel_day_period = as.factor(if_else(thtr_rel_day >= 1 & thtr_rel_day <= 10, "early",
+                              if_else(thtr_rel_day >=11 & thtr_rel_day <= 20, "mid", "late"))),
+         dvd_rel_day_period  = as.factor(if_else(dvd_rel_day >= 1 & dvd_rel_day <= 10, "early",
+                              if_else(dvd_rel_day >=11 & dvd_rel_day <= 20, "mid", "late"))),
+         thtr_rel_month = as.factor(as.character(thtr_rel_month)),
+         dvd_rel_month  = as.factor(as.character(dvd_rel_month))
+         ) %>% 
+  select(audience_score, runtime, imdb_rating, imdb_num_votes, critics_score, 
+         thtr_rel_month, thtr_rel_day_period, dvd_rel_month, dvd_rel_day_period,
+         title_type, genre, mpaa_rating, critics_rating, 
+         best_pic_nom, best_pic_win, best_actor_win, 
+         best_actress_win, best_dir_win, top200_box)
+```
+I select valiables for the exploratory data analysis.
+
+**Check relationship among numeric variables**
+```{r}
+ggpairs(movies_set, columns = c(1:5))
+```
+
+There are strong correleation between audience_score and imdb_rating.
+And critics_score also show strong correlation with audience_score.
+However There are strong correleation between imdb_rating and critics_score.
+Therefore, I just choose imdb_rating which shows stronger correlation with audience_score and drop the critics_score due to collinearity.
+
+**Check relationship among date(period) variables**
+```{r}
+ggpairs(movies_set, columns = c(1,6:9))
+```
+
+These are relationship among month, period and audience_score.
+
+**Check relationship among categorical variables**
+```{r}
+ggpairs(movies_set, columns = c(1,10:13))
+```
+
+These are relationship among title_type, genre, mpaa_rating, critics_rating and audience_score.
+
+**Check relationship among categorical variables (Yes or No)**
+```{r}
+ggpairs(movies_set, columns = c(1,14:19))
+```
+
+These are relationship between nomination and audience_score.
+
+* * *
+
+## Part 4: Modeling
+
+**Start to build muliple regression model**
+```{r}
+movies_score_1 <- lm(audience_score ~ runtime + imdb_rating + imdb_num_votes + critics_score +
+                   thtr_rel_month + thtr_rel_day_period + dvd_rel_month + dvd_rel_day_period +
+                   title_type + genre + mpaa_rating + critics_rating +
+                   best_pic_nom + best_pic_win + best_actor_win +
+                   best_actress_win + best_dir_win + top200_box, data = movies_set)
+summary(movies_score_1)
+```
+
+For model selection, I will choose backwards elimination using the adjusted R squared method.
+And I will remove "critics_score" first.
+
+**Backwards elimination - adjusted R squared method**
+```{r}
+movies_score_2 <- lm(audience_score ~ runtime + imdb_rating + imdb_num_votes + 
+                       thtr_rel_month + thtr_rel_day_period + dvd_rel_month + dvd_rel_day_period +
+                       title_type + genre + mpaa_rating + critics_rating +
+                       best_pic_nom + best_pic_win + best_actor_win +
+                       best_actress_win + best_dir_win + top200_box, data = movies_set)
+summary(movies_score_1)
+```
+
+I can repeat removing each one of the variables one at a time until none of these options actually yield an increased adjusted R squared. 
+
+**Model selection**
+```{r}
+movies_score_12 <- lm(audience_score ~ runtime + imdb_rating + 
+                       dvd_rel_month + 
+                       genre + critics_rating +
+                       best_pic_nom  + 
+                       best_actress_win, data = movies_set)
+summary(movies_score_12)
+```
+
+```{r}
+movies_score_13 <- lm(audience_score ~ runtime + imdb_rating + 
+                        dvd_rel_month + 
+                        genre + critics_rating +
+                        best_pic_nom, data = movies_set)
+summary(movies_score_13)
+```
+
+When I remove the best_actress_win, adjusted R squared is actually decreased.
+Therefore, I choose movies_score_12 as a final model, movies_model
+
+**Final model**
+```{r}
+movies_model <- lm(audience_score ~ runtime + imdb_rating + 
+                     dvd_rel_month + 
+                     genre +  critics_rating +
+                     best_pic_nom + best_actress_win , data = movies_set)
+```
+
+**Check collinearity**
+```{r}
+movies_model_set <- movies_set %>% select(runtime, imdb_rating,
+                                        dvd_rel_month, 
+                                        genre, critics_rating,
+                                        best_pic_nom, best_actress_win)
+
+ggpairs(movies_model_set, columns = c(1:7))
+```
+To check collinearity among those explanatory variables, Let's drow a plots.
+There are no definite relatioship.
+
+* * *
+
+## Part 5: Prediction
+
+**Set data to predict**
+```{r}
+movies_predict <- movies %>% 
+  filter(title == "Godzilla") %>% 
+  mutate(dvd_rel_month  = as.factor(as.character(dvd_rel_month))) %>% 
+  select(runtime, imdb_rating, dvd_rel_month, genre, critics_rating, best_pic_nom, best_actress_win)
+```
+
+**Predict the audience_score of the movie "Godzilla"**
+```{r}
+predict(movies_model, movies_predict)
+```
+Predicted audience_score of "Godzilla" is 61.04.
+
+**Construct a prediction interval around this prediction**
+```{r}
+predict(movies_model, movies_predict, interval = "prediction", level = 0.95)
+```
+The model predicts, with 95% confidence, audience_score of "Godzilla" is expected between 41.43 and 80.65.
+
+**Predicted vs. Actual audience_score**
+```{r}
+movies %>% filter(title == "Godzilla") %>% select(audience_score)
+```
+The actual audience_score of "Godzilla" is 66 and it is wihin the model prediction.
+
+**Diagnostics for the model**
+```{r}
+hist(movies_model$residuals, main = 'Histogram of Residuals')
+```
+```{r}
+qqnorm(movies_model$residuals, main = 'Normal Probability Plot of Residuals')
+qqline(movies_model$residuals)
+```
+An observation of the histogram of residuals above show a normal distribution 
+We see that most of the deviation occurs at the tail of the distriubtion when looking at the Q Q plot. 
+It is clear that this is a linear distribution, so we will consider this test passed. 
+(the expression above excerpted from Multiple regression Coursera lecture)
+
+```{r}
+plot(movies_model$residuals ~ movies_set$runtime, main = 'Residuals vs. Runtime')
+
+plot(movies_model$residuals ~ movies_set$imdb_rating, main = 'Residuals vs. imdb_rating')
+```
+
+we want our residuals to be randomly scattered around zero. 
+Seems like we're somewhat meeting the condition here.
+(the expression above excerpted from Multiple regression Coursera lecture)
+
+```{r}
+plot(movies_model$residuals ~ movies_model$fitted, main = 'Residuals vs. fitted')
+
+plot(abs(movies_model$residuals) ~ movies_model$fitted, main = 'Absolute value of residuals vs. fitted')
+```
+
+We don't see a definite fan shape here. It appears that the variability of the residual stays constant as the value of the fitted or the predicted values change, so, the constant variability condition appears to be met.
+(the expression above excerpted from Multiple regression Coursera lecture)
+
+* * *
+
+## Part 6: Conclusion
+
+The purpose of this research is to find out what variables have relationship with audience_score.
+I build a MLR and there are variables which can explain the audience_score.
+Those variables are runtime, imdb_rating, dvd_rel_month, genre, critics_rating, best_pic_nom, best_actress.
+If imdb_rating increases by 1 point, audience_score is expected to increase by 15.1 points.
+And if runtime increases by 1 point, audience_score is expected to decrease by 0.04 points.
+
+Though we can not assume that there is causality, we can predict audience_score with the model roughly.
+
+
+**End of the research**
