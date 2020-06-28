@@ -74,6 +74,7 @@ Thirdly, I will omit title, studio, director, actor, imdb_url which do not make 
 ```{r}
 summary(movies)
 ```
+
 There are some missing valuse in 'runtime' and 'dvd_rel_'.
 Therefore the observation should be filtered.
 And I will omit the movie "Godzilla" to test the model later.
@@ -95,6 +96,7 @@ movies_set <- movies %>%
          best_pic_nom, best_pic_win, best_actor_win, 
          best_actress_win, best_dir_win, top200_box)
 ```
+
 I select valiables for the exploratory data analysis.
 
 **Check relationship among numeric variables**
@@ -195,6 +197,7 @@ movies_model_set <- movies_set %>% select(runtime, imdb_rating,
 
 ggpairs(movies_model_set, columns = c(1:7))
 ```
+
 To check collinearity among those explanatory variables, Let's drow a plots.
 There are no definite relatioship.
 
@@ -214,18 +217,21 @@ movies_predict <- movies %>%
 ```{r}
 predict(movies_model, movies_predict)
 ```
+
 Predicted audience_score of "Godzilla" is 61.04.
 
 **Construct a prediction interval around this prediction**
 ```{r}
 predict(movies_model, movies_predict, interval = "prediction", level = 0.95)
 ```
+
 The model predicts, with 95% confidence, audience_score of "Godzilla" is expected between 41.43 and 80.65.
 
 **Predicted vs. Actual audience_score**
 ```{r}
 movies %>% filter(title == "Godzilla") %>% select(audience_score)
 ```
+
 The actual audience_score of "Godzilla" is 66 and it is wihin the model prediction.
 
 **Diagnostics for the model**
@@ -236,6 +242,7 @@ hist(movies_model$residuals, main = 'Histogram of Residuals')
 qqnorm(movies_model$residuals, main = 'Normal Probability Plot of Residuals')
 qqline(movies_model$residuals)
 ```
+
 An observation of the histogram of residuals above show a normal distribution 
 We see that most of the deviation occurs at the tail of the distriubtion when looking at the Q Q plot. 
 It is clear that this is a linear distribution, so we will consider this test passed. 
